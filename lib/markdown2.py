@@ -1268,38 +1268,21 @@ class Markdown(object):
 
     def _h_sub(self, match):
         if match.group(1) is not None:
-            return self._setext_h_sub(match)
+            level = {"=": 1, "-": 2}[match.group(3)[0]]
+            text = match.group(2)
         else:
-            return self._atx_h_sub(match)
-
-    def _setext_h_sub(self, match):
-        n = {"=": 1, "-": 2}[match.group(3)[0]]
-        demote_headers = self.extras.get("demote-headers")
-        if demote_headers:
-            n = min(n + demote_headers, 6)
-        header_id_attr = ""
-        if "header-ids" in self.extras:
-            header_id = self.header_id_from_text(match.group(2),
-                self.extras["header-ids"], n)
-            if header_id:
-                header_id_attr = ' id="%s"' % header_id
-        html = self._run_span_gamut(match.group(2))
-        if "toc" in self.extras and header_id:
-            self._toc_add_entry(n, header_id, html)
-        return "<h%d%s>%s</h%d>\n\n" % (n, header_id_attr, html, n)
-
-    def _atx_h_sub(self, match):
-        n = len(match.group(5))
+            level = len(match.group(5))
+            text = match.group(6)
         demote_headers = self.extras.get("demote-headers")
         if demote_headers:
             level = min(level + demote_headers, 6)
         header_id_attr = ""
         if "header-ids" in self.extras:
-            header_id = self.header_id_from_text(match.group(6),
-                self.extras["header-ids"], n)
+            header_id = self.header_id_from_text(text,
+                self.extras["header-ids"], level)
             if header_id:
                 header_id_attr = ' id="%s"' % header_id
-        html = self._run_span_gamut(match.group(6))
+        html = self._run_span_gamut(text)
         if "toc" in self.extras and header_id:
             self._toc_add_entry(level, header_id, html)
         return "<h%d%s>%s</h%d>\n\n" % (level, header_id_attr, html, level)
