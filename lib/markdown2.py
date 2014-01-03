@@ -82,7 +82,7 @@ see <https://github.com/trentm/python-markdown2/wiki/Extras> for details):
 #   not yet sure if there implications with this. Compare 'pydoc sre'
 #   and 'perldoc perlre'.
 
-__version_info__ = (2, 1, 1)
+__version_info__ = (2, 2, 1)
 __version__ = '.'.join(map(str, __version_info__))
 __author__ = "Trent Mick"
 
@@ -919,8 +919,10 @@ class Markdown(object):
             text = self._do_smart_punctuation(text)
 
         # Do hard breaks:
-        _break_re = r" *\n" if "break-on-newline" in self.extras else r" {2,}\n"
-        text = re.sub(_break_re, " <br%s\n" % self.empty_element_suffix, text)
+        if "break-on-newline" in self.extras:
+            text = re.sub(r" *\n", "<br%s\n" % self.empty_element_suffix, text)
+        else:
+            text = re.sub(r" {2,}\n", " <br%s\n" % self.empty_element_suffix, text)
 
         return text
 
@@ -1010,14 +1012,18 @@ class Markdown(object):
             raise MarkdownError("invalid value for 'safe_mode': %r (must be "
                                 "'escape' or 'replace')" % self.safe_mode)
 
+    """
+    The expression [^ \t'"]* is used instead of .* because of special cases
+    for links. Specifically: inline links, quotes in links, and odd anchors.
+    """
     _tail_of_inline_link_re = re.compile(r'''
           # Match tail of: [text](/url/) or [text](/url/ "title")
           \(            # literal paren
             [ \t]*
             (?P<url>            # \1
-                <.*?>
+                <[^ \t'"]*>
                 |
-                .*?
+                [^ \t'"]*
             )
             [ \t]*
             (                   # \2
@@ -1140,10 +1146,11 @@ class Markdown(object):
                     else:
                         title_str = ''
                     if is_img:
-                        result = '<img src="%s" alt="%s"%s%s' \
+                        img_class_str = self._html_class_str_from_tag("img")
+                        result = '<img src="%s" alt="%s"%s%s%s' \
                             % (url.replace('"', '&quot;'),
                                _xml_escape_attr(link_text),
-                               title_str, self.empty_element_suffix)
+                               title_str, img_class_str, self.empty_element_suffix)
                         if "smarty-pants" in self.extras:
                             result = result.replace('"', self._escape_table['"'])
                         curr_pos = start_idx + len(result)
@@ -1190,10 +1197,11 @@ class Markdown(object):
                         else:
                             title_str = ''
                         if is_img:
-                            result = '<img src="%s" alt="%s"%s%s' \
+                            img_class_str = self._html_class_str_from_tag("img")
+                            result = '<img src="%s" alt="%s"%s%s%s' \
                                 % (url.replace('"', '&quot;'),
                                    link_text.replace('"', '&quot;'),
-                                   title_str, self.empty_element_suffix)
+                                   title_str, img_class_str, self.empty_element_suffix)
                             if "smarty-pants" in self.extras:
                                 result = result.replace('"', self._escape_table['"'])
                             curr_pos = start_idx + len(result)

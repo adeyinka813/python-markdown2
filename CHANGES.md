@@ -1,9 +1,17 @@
 # python-markdown2 Changelog
 
-## python-markdown2 2.1.1 (not yet released)
+## python-markdown2 2.2.1 (not yet released)
+
+(nothing yet)
+
+
+## python-markdown2 2.2.0
 
 - [issue #135] Fix fenced code blocks odd rendering.
 - [pull #138] specify shell in Makefile
+- [pull #130] break-on-newline extra
+- [pull #140] Allow html-classes for img
+- [pull #122] Allow parentheses in urls
 
 
 ## python-markdown2 2.1.0
