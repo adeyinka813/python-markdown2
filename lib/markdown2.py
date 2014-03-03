@@ -308,14 +308,14 @@ class Markdown(object):
 
         text = self.preprocess(text)
 
+        if "fenced-code-blocks" in self.extras:
+            text = self._do_fenced_code_blocks(text)
+
         if self.safe_mode:
             text = self._hash_html_spans(text)
 
         # Turn block-level HTML blocks into hash entries
         text = self._hash_html_blocks(text, raw=True)
-
-        if "fenced-code-blocks" in self.extras:
-            text = self._do_fenced_code_blocks(text)
 
         # Strip link definitions, store in hashes.
         if "footnotes" in self.extras:
@@ -1293,39 +1293,46 @@ class Markdown(object):
             self._toc = []
         self._toc.append((level, id, self._unescape_special_chars(name)))
 
-    _h_re = re.compile(r'''
+    _h_re_base = r'''
         (^(.+)[ \t]*\n(=+|-+)[ \t]*\n+)
         |
         (^(\#{1,6})  # \1 = string of #'s
-        [ \t]+
+        [ \t]%s
         (.+?)       # \2 = Header text
         [ \t]*
         (?<!\\)     # ensure not an escaped trailing '#'
         \#*         # optional closing #'s (not counted)
         \n+
         )
-        ''', re.X | re.M)
+        '''
+
+    _h_re = re.compile(_h_re_base % '*', re.X | re.M)
+    _h_re_tag_friendly = re.compile(_h_re_base % '+', re.X | re.M)
+
 
     def _h_sub(self, match):
         if match.group(1) is not None:
-            level = {"=": 1, "-": 2}[match.group(3)[0]]
-            text = match.group(2)
+            # Setext header
+            n = {"=": 1, "-": 2}[match.group(3)[0]]
+            header_group = match.group(2)
         else:
-            level = len(match.group(5))
-            text = match.group(6)
+            # atx header
+            n = len(match.group(5))
+            header_group = match.group(6)
+
         demote_headers = self.extras.get("demote-headers")
         if demote_headers:
-            level = min(level + demote_headers, 6)
+            n = min(n + demote_headers, 6)
         header_id_attr = ""
         if "header-ids" in self.extras:
-            header_id = self.header_id_from_text(text,
-                self.extras["header-ids"], level)
+            header_id = self.header_id_from_text(header_group,
+                self.extras["header-ids"], n)
             if header_id:
                 header_id_attr = ' id="%s"' % header_id
-        html = self._run_span_gamut(text)
+        html = self._run_span_gamut(header_group)
         if "toc" in self.extras and header_id:
-            self._toc_add_entry(level, header_id, html)
-        return "<h%d%s>%s</h%d>\n\n" % (level, header_id_attr, html, level)
+            self._toc_add_entry(n, header_id, html)
+        return "<h%d%s>%s</h%d>\n\n" % (n, header_id_attr, html, n)
 
     def _do_headers(self, text):
         # Setext-style headers:
@@ -1342,9 +1349,9 @@ class Markdown(object):
         #   ...
         #   ###### Header 6
 
-        text = self._h_re.sub(self._h_sub, text)
-        return text
-
+        if 'tag-friendly' in self.extras:
+            return self._h_re_tag_friendly.sub(self._h_sub, text)
+        return self._h_re.sub(self._h_sub, text)
 
     _marker_ul_chars  = '*+-'
     _marker_any = r'(?:[%s]|\d+\.)' % _marker_ul_chars
@@ -1561,6 +1568,9 @@ class Markdown(object):
               )+
             )
             ((?=^[ ]{0,%d}\S)|\Z)   # Lookahead for non-space at line-start, or end of doc
+            # Lookahead to make sure this block isn't already in a code block.
+            # Needed when syntax highlighting is being used.
+            (?![^<]*\</code\>)
             ''' % (self.tab_width, self.tab_width),
             re.M | re.X)
         return code_block_re.sub(self._code_block_sub, text)
